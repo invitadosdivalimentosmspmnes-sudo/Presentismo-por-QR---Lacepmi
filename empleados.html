@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Empleados · LACEPMI Presentismo QR</title>
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/responsive.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+
+<main class="main">
+  <a class="back-link" href="index.html"><i data-lucide="arrow-left"></i>Volver al dashboard</a>
+  <div class="page-header">
+    <div>
+      <h1>Empleados</h1>
+      <p>Nómina oficial del laboratorio, cargada desde el PDF institucional.</p>
+    </div>
+  </div>
+
+  <div class="filtros-bar">
+    <div class="field" style="min-width:260px">
+      <label>Buscar por nombre</label>
+      <input type="text" id="inputBusqueda" placeholder="Ej: Aguirre, Carlos…">
+    </div>
+  </div>
+
+  <div id="listaEmpleados">Cargando…</div>
+</main>
+
+<div id="modalHistorial"></div>
+
+<script src="js/config.js?v=2"></script>
+<script src="js/api.js?v=2"></script>
+<script src="js/app.js"></script>
+<script>
+
+let empleados = [];
+
+async function cargar() {
+  const cont = document.getElementById('listaEmpleados');
+  cont.innerHTML = elCarga();
+  try {
+    empleados = await Api.getEmpleados();
+    render(empleados);
+  } catch (err) {
+    cont.innerHTML = elError(mensajeErrorApi(err));
+  }
+}
+
+function render(lista) {
+  const cont = document.getElementById('listaEmpleados');
+  if (lista.length === 0) {
+    cont.innerHTML = elVacio('No se encontraron empleados', 'Probá con otro término de búsqueda.', 'users');
+    refrescarIconos();
+    return;
+  }
+  cont.innerHTML = '<div class="persona-grid">' + lista.map(function (e) {
+    const iniciales = (e.APELLIDO || '').charAt(0) + (e.NOMBRES || '').charAt(0);
+    return '<div class="persona-card" style="cursor:pointer" data-id="' + escapeHtml(e.ID_EMPLEADO) + '">' +
+      '<div class="persona-card__avatar">' + escapeHtml(iniciales.toUpperCase()) + '</div>' +
+      '<div class="persona-card__nombre">' + escapeHtml(e.NOMBRE_COMPLETO) + '</div>' +
+      '<div class="persona-card__id">' + escapeHtml(e.ID_EMPLEADO) + '</div>' +
+      '<div class="persona-card__meta">DNI: ' + enmascararDni(e.DNI) + (e.SECTOR ? ' · ' + escapeHtml(e.SECTOR) : '') + '</div>' +
+    '</div>';
+  }).join('') + '</div>';
+
+  document.querySelectorAll('.persona-card').forEach(function (card) {
+    card.addEventListener('click', function () {
+      abrirHistorial(card.getAttribute('data-id'), 'EMPLEADO');
+    });
+  });
+}
+
+document.getElementById('inputBusqueda').addEventListener('input', function (e) {
+  const q = e.target.value.toLowerCase();
+  render(empleados.filter(function (emp) {
+    return String(emp.NOMBRE_COMPLETO).toLowerCase().indexOf(q) !== -1;
+  }));
+});
+
+async function abrirHistorial(idPersona, tipoPersona) {
+  const modal = document.getElementById('modalHistorial');
+  modal.innerHTML =
+    '<div class="overlay" id="overlayHist">' +
+      '<div class="modal" style="max-width:560px; max-height:80vh; overflow:auto;">' +
+        '<div id="histContenido">' + elCarga('Cargando historial…') + '</div>' +
+        '<div class="modal__actions"><button class="btn btn--secondary btn--full" id="btnCerrarHist">Cerrar</button></div>' +
+      '</div>' +
+    '</div>';
+  refrescarIconos();
+  document.getElementById('btnCerrarHist').addEventListener('click', function () { modal.innerHTML = ''; });
+  document.getElementById('overlayHist').addEventListener('click', function (e) {
+    if (e.target.id === 'overlayHist') modal.innerHTML = '';
+  });
+
+  try {
+    const registros = await Api.getRegistros({ persona_id: idPersona });
+    const persona = tipoPersona === 'EMPLEADO'
+      ? empleados.find(function (e) { return e.ID_EMPLEADO === idPersona; })
+      : null;
+
+    const resumen = {};
+    TIPOS_REGISTRO.forEach(function (t) { resumen[t.valor] = 0; });
+    registros.forEach(function (r) { if (resumen.hasOwnProperty(r.TIPO_REGISTRO)) resumen[r.TIPO_REGISTRO]++; });
+
+    const resumenHtml = TIPOS_REGISTRO.map(function (t) {
+      return '<div class="stat-card" style="padding:10px 12px;"><div class="stat-card__label">' + t.etiqueta + '</div><div class="stat-card__num" style="font-size:19px">' + resumen[t.valor] + '</div></div>';
+    }).join('');
+
+    const filasHtml = registros.length
+      ? registros.slice(0, 30).map(function (r) {
+          return '<tr><td>' + formatFechaCorta(r.FECHA) + '</td><td>' + escapeHtml(r.HORA) + '</td><td>' + badgeTipoRegistro(r.TIPO_REGISTRO) + '</td><td>' + escapeHtml(r.OBSERVACION || '—') + '</td></tr>';
+        }).join('')
+      : '<tr><td colspan="4" style="text-align:center; color:var(--color-gris-oscuro)">Sin registros todavía</td></tr>';
+
+    document.getElementById('histContenido').innerHTML =
+      '<h3>' + escapeHtml(persona ? persona.NOMBRE_COMPLETO : idPersona) + '</h3>' +
+      '<p class="dni-mono">' + escapeHtml(idPersona) + '</p>' +
+      '<div class="stat-grid" style="grid-template-columns:repeat(4,1fr); margin:14px 0;">' + resumenHtml + '</div>' +
+      '<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Observación</th></tr></thead><tbody>' + filasHtml + '</tbody></table></div>';
+    refrescarIconos();
+  } catch (err) {
+    document.getElementById('histContenido').innerHTML = elError(mensajeErrorApi(err));
+    refrescarIconos();
+  }
+}
+
+cargar();
+</script>
+</body>
+</html>

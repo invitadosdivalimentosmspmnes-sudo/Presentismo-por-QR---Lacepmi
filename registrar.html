@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registrar · LACEPMI Presentismo QR</title>
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/responsive.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+</head>
+<body>
+
+<main class="main">
+  <a class="back-link" href="index.html"><i data-lucide="arrow-left"></i>Volver al dashboard</a>
+  <div class="page-header">
+    <div>
+      <h1>Registrar asistencia</h1>
+      <p>Escaneá el código QR de un empleado o invitado para registrar su movimiento.</p>
+    </div>
+  </div>
+
+  <div id="contenido" class="scanner-shell">
+    <!-- Se completa dinámicamente -->
+  </div>
+</main>
+
+<script src="js/config.js?v=2"></script>
+<script src="js/api.js?v=2"></script>
+<script src="js/app.js"></script>
+<script src="js/qr.js"></script>
+<script>
+
+const params = new URLSearchParams(window.location.search);
+const tipoPreseleccionado = params.get('tipo');
+
+const contenido = document.getElementById('contenido');
+let personaActual = null;
+let tipoActual = tipoPreseleccionado;
+let observacionActual = '';
+
+function vistaScanner() {
+  contenido.innerHTML =
+    '<div class="scanner-frame"><video id="video" playsinline muted></video><div class="scanner-frame__guide"></div></div>' +
+    '<div class="scanner-status" id="scannerStatus">Iniciando cámara…</div>' +
+    '<div id="scannerAyuda"></div>';
+  refrescarIconos();
+
+  const video = document.getElementById('video');
+  const status = document.getElementById('scannerStatus');
+
+  QrScanner.iniciar(video, onQrDetectado, function (estado) {
+    if (estado === 'sin-camara') {
+      mostrarErrorCamara('Este dispositivo no tiene una cámara disponible o el navegador no la soporta.');
+    } else if (estado === 'permiso-denegado') {
+      mostrarErrorCamara('Se denegó el permiso de cámara. Habilitalo en la configuración del navegador para poder escanear.');
+    } else if (estado === 'activo') {
+      status.textContent = 'Apuntá la cámara al código QR';
+    }
+  });
+}
+
+function mostrarErrorCamara(mensaje) {
+  document.getElementById('scannerAyuda').innerHTML =
+    '<div class="banner-error" style="margin-top:14px"><i data-lucide="camera-off"></i><span>' + mensaje + '</span></div>' +
+    '<button class="btn btn--secondary btn--full" style="margin-top:10px" onclick="vistaScanner()">Reintentar</button>';
+  refrescarIconos();
+}
+
+async function onQrDetectado(qrTexto) {
+  document.getElementById('scannerStatus').textContent = 'Código detectado, identificando…';
+  QrScanner.detener();
+  try {
+    const res = await Api.identificar(qrTexto);
+    if (!res.encontrado) {
+      vistaQrInvalido();
+      return;
+    }
+    personaActual = { tipo: res.tipo, datos: res.persona };
+    vistaPersonaIdentificada();
+  } catch (err) {
+    vistaErrorApi(err, function () { vistaScanner(); });
+  }
+}
+
+function vistaQrInvalido() {
+  contenido.innerHTML =
+    '<div class="feedback feedback--error">' +
+      '<div class="feedback__icon"><i data-lucide="qr-code" style="width:100%;height:100%"></i></div>' +
+      '<div class="feedback__titulo">QR no reconocido</div>' +
+      '<p>Este código no corresponde a ningún empleado o invitado registrado.</p>' +
+      '<button class="btn btn--primary" style="margin-top:12px" onclick="vistaScanner()">Volver a escanear</button>' +
+    '</div>';
+  refrescarIconos();
+}
+
+function vistaErrorApi(err, onReintentar) {
+  contenido.innerHTML =
+    '<div class="feedback feedback--error">' +
+      '<div class="feedback__icon"><i data-lucide="wifi-off" style="width:100%;height:100%"></i></div>' +
+      '<div class="feedback__titulo">No se pudo completar la operación</div>' +
+      '<p>' + escapeHtml(mensajeErrorApi(err)) + '</p>' +
+      '<button class="btn btn--primary" style="margin-top:12px" id="btnReintentar">Reintentar</button>' +
+    '</div>';
+  refrescarIconos();
+  document.getElementById('btnReintentar').addEventListener('click', onReintentar);
+}
+
+function vistaPersonaIdentificada() {
+  const p = personaActual.datos;
+  const esEmpleado = personaActual.tipo === 'EMPLEADO';
+  const nombre = p.NOMBRE_COMPLETO;
+  const idPersona = esEmpleado ? p.ID_EMPLEADO : p.ID_INVITADO;
+
+  const tiposHtml = TIPOS_REGISTRO.map(function (t) {
+    const sel = t.valor === tipoActual ? ' is-selected' : '';
+    return '<button class="tipo-btn' + sel + '" data-tipo="' + t.valor + '">' +
+      '<i data-lucide="' + t.icono + '"></i><span>' + t.etiqueta + '</span></button>';
+  }).join('');
+
+  contenido.innerHTML =
+    '<div class="persona-identificada">' +
+      '<div class="persona-identificada__badge">' + (esEmpleado ? 'EMPLEADO IDENTIFICADO' : 'INVITADO IDENTIFICADO') + '</div>' +
+      '<div class="persona-identificada__nombre">' + escapeHtml(nombre) + '</div>' +
+      '<div class="persona-identificada__dni">DNI: ' + enmascararDni(p.DNI) + '</div>' +
+    '</div>' +
+    '<div class="section-label">Seleccioná el tipo de registro</div>' +
+    '<div class="tipo-grid">' + tiposHtml + '</div>' +
+    '<div id="observacionWrap"></div>' +
+    '<div id="accionesWrap" style="margin-top:16px; display:flex; gap:10px;">' +
+      '<button class="btn btn--secondary" style="flex:1" onclick="vistaScanner()">Cancelar</button>' +
+      '<button class="btn btn--primary" style="flex:2" id="btnContinuar" disabled>Confirmar</button>' +
+    '</div>';
+  refrescarIconos();
+
+  document.querySelectorAll('.tipo-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      tipoActual = btn.getAttribute('data-tipo');
+      document.querySelectorAll('.tipo-btn').forEach(function (b) { b.classList.remove('is-selected'); });
+      btn.classList.add('is-selected');
+      actualizarObservacion();
+      actualizarBotonContinuar();
+    });
+  });
+
+  document.getElementById('btnContinuar').addEventListener('click', function () {
+    if (tipoActual === 'OTRO MOTIVO') {
+      observacionActual = document.getElementById('inputObservacion').value.trim();
+    }
+    vistaConfirmacion(idPersona, nombre, esEmpleado);
+  });
+
+  actualizarObservacion();
+  actualizarBotonContinuar();
+}
+
+function actualizarObservacion() {
+  const wrap = document.getElementById('observacionWrap');
+  const esOtro = tipoActual === 'OTRO MOTIVO';
+  const esOpcional = ['AUDITORÍA', 'CAPACITACIÓN', 'REUNIÓN'].indexOf(tipoActual) !== -1;
+  if (esOtro) {
+    wrap.innerHTML =
+      '<div class="field" style="margin-top:14px"><label>Especifique el motivo *</label>' +
+      '<textarea id="inputObservacion" rows="2" placeholder="Detalle el motivo del registro"></textarea></div>';
+    document.getElementById('inputObservacion').addEventListener('input', actualizarBotonContinuar);
+  } else if (esOpcional) {
+    wrap.innerHTML =
+      '<div class="field" style="margin-top:14px"><label>Observación (opcional)</label>' +
+      '<textarea id="inputObservacion" rows="2" placeholder="Agregar contexto adicional"></textarea></div>';
+  } else {
+    wrap.innerHTML = '';
+  }
+}
+
+function actualizarBotonContinuar() {
+  const btn = document.getElementById('btnContinuar');
+  if (!btn) return;
+  if (!tipoActual) { btn.disabled = true; return; }
+  if (tipoActual === 'OTRO MOTIVO') {
+    const val = document.getElementById('inputObservacion') ? document.getElementById('inputObservacion').value.trim() : '';
+    btn.disabled = val.length === 0;
+  } else {
+    btn.disabled = false;
+  }
+}
+
+function vistaConfirmacion(idPersona, nombre, esEmpleado) {
+  const info = tipoRegistroInfo(tipoActual);
+  contenido.innerHTML =
+    '<div class="panel">' +
+      '<div class="section-label" style="margin-top:0">Confirmar registro</div>' +
+      '<p style="font-size:15px; color:var(--color-texto); font-weight:600">' + escapeHtml(nombre) + '</p>' +
+      '<p>' + (esEmpleado ? 'Empleado' : 'Invitado') + ' · ' + escapeHtml(idPersona) + '</p>' +
+      '<div style="margin:14px 0"><span class="badge badge--azul"><i data-lucide="' + info.icono + '" style="width:12px;height:12px"></i>' + info.etiqueta + '</span></div>' +
+      (observacionActual ? '<p><strong>Observación:</strong> ' + escapeHtml(observacionActual) + '</p>' : '') +
+      '<div style="display:flex; gap:10px; margin-top:16px;">' +
+        '<button class="btn btn--secondary" style="flex:1" onclick="vistaPersonaIdentificada()">Volver</button>' +
+        '<button class="btn btn--primary" style="flex:2" id="btnGuardar">Guardar registro</button>' +
+      '</div>' +
+    '</div>';
+  refrescarIconos();
+
+  document.getElementById('btnGuardar').addEventListener('click', function () {
+    guardarRegistro(idPersona, nombre, esEmpleado, false);
+  });
+}
+
+async function guardarRegistro(idPersona, nombre, esEmpleado, forzar) {
+  const btn = document.getElementById('btnGuardar');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const res = await Api.registrar({
+      persona_tipo: esEmpleado ? 'EMPLEADO' : 'INVITADO',
+      persona_id: idPersona,
+      tipo: tipoActual,
+      observacion: observacionActual,
+      forzar: forzar
+    });
+
+    if (!res.ok && res.duplicado) {
+      vistaDuplicado(idPersona, nombre, esEmpleado);
+      return;
+    }
+    if (!res.ok) {
+      vistaErrorGuardado(res.error || 'No se pudo guardar el registro.');
+      return;
+    }
+
+    vistaExito(res.registro);
+  } catch (err) {
+    vistaErrorGuardado(mensajeErrorApi(err));
+  }
+}
+
+function vistaDuplicado(idPersona, nombre, esEmpleado) {
+  contenido.innerHTML =
+    '<div class="overlay"><div class="modal">' +
+      '<h3>Posible registro duplicado</h3>' +
+      '<p>Ya se registró este mismo movimiento para <strong>' + escapeHtml(nombre) + '</strong> hace instantes. ¿Querés registrarlo de todas formas?</p>' +
+      '<div class="modal__actions">' +
+        '<button class="btn btn--secondary" id="btnCancelarDup">Cancelar</button>' +
+        '<button class="btn btn--primary" id="btnForzarDup">Registrar igual</button>' +
+      '</div>' +
+    '</div></div>';
+  document.getElementById('btnCancelarDup').addEventListener('click', function () { vistaScanner(); });
+  document.getElementById('btnForzarDup').addEventListener('click', function () {
+    guardarRegistro(idPersona, nombre, esEmpleado, true);
+  });
+}
+
+function vistaErrorGuardado(mensaje) {
+  contenido.innerHTML =
+    '<div class="feedback feedback--error">' +
+      '<div class="feedback__icon"><i data-lucide="alert-triangle" style="width:100%;height:100%"></i></div>' +
+      '<div class="feedback__titulo">No se pudo guardar el registro</div>' +
+      '<p>' + escapeHtml(mensaje) + '</p>' +
+      '<button class="btn btn--primary" style="margin-top:12px" onclick="vistaScanner()">Volver a escanear</button>' +
+    '</div>';
+  refrescarIconos();
+}
+
+function vistaExito(registro) {
+  const info = tipoRegistroInfo(registro.TIPO_REGISTRO);
+  contenido.innerHTML =
+    '<div class="feedback feedback--exito">' +
+      '<div class="feedback__icon"><i data-lucide="check-circle" style="width:100%;height:100%"></i></div>' +
+      '<div class="feedback__titulo">Registro realizado correctamente</div>' +
+      '<p style="font-weight:600; color:var(--color-texto); font-size:15px; margin-top:8px">' + escapeHtml(registro.NOMBRE_COMPLETO) + '</p>' +
+      '<p>' + info.etiqueta + ' — ' + formatFechaCorta(registro.FECHA) + ' · ' + registro.HORA + '</p>' +
+      '<button class="btn btn--primary" style="margin-top:14px" onclick="reiniciar()">Registrar otro</button>' +
+    '</div>';
+  refrescarIconos();
+}
+
+function reiniciar() {
+  personaActual = null;
+  tipoActual = tipoPreseleccionado;
+  observacionActual = '';
+  vistaScanner();
+}
+
+vistaScanner();
+</script>
+</body>
+</html>

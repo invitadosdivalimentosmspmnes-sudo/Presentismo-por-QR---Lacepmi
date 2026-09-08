@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registros · LACEPMI Presentismo QR</title>
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/responsive.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<main class="main">
+  <a class="back-link" href="index.html"><i data-lucide="arrow-left"></i>Volver al dashboard</a>
+  <div class="page-header">
+    <div>
+      <h1>Registros</h1>
+      <p>Historial completo de movimientos de empleados e invitados.</p>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn--secondary" id="btnCsv"><i data-lucide="download"></i>CSV</button>
+      <button class="btn btn--secondary" id="btnExcel"><i data-lucide="file-spreadsheet"></i>Excel</button>
+    </div>
+  </div>
+
+  <div class="filtros-bar">
+    <div class="field"><label>Buscar por nombre</label><input type="text" id="fBusqueda" placeholder="Nombre y apellido…"></div>
+    <div class="field"><label>Tipo de persona</label>
+      <select id="fTipoPersona"><option value="">Todos</option><option value="EMPLEADO">Empleado</option><option value="INVITADO">Invitado</option></select>
+    </div>
+    <div class="field"><label>Tipo de registro</label>
+      <select id="fTipoRegistro"><option value="">Todos</option></select>
+    </div>
+    <div class="field"><label>Desde</label><input type="date" id="fDesde"></div>
+    <div class="field"><label>Hasta</label><input type="date" id="fHasta"></div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn--primary" id="btnBuscar"><i data-lucide="search"></i>Buscar</button>
+      <button class="btn btn--secondary" id="btnLimpiar">Limpiar filtros</button>
+      <button class="btn btn--ghost" id="btnActualizar" title="Actualizar"><i data-lucide="refresh-cw"></i></button>
+    </div>
+  </div>
+
+  <div id="tablaWrap">Cargando…</div>
+</main>
+
+<script src="js/config.js?v=2"></script>
+<script src="js/api.js?v=2"></script>
+<script src="js/app.js"></script>
+<script>
+
+let registrosActuales = [];
+
+const selTipoRegistro = document.getElementById('fTipoRegistro');
+TIPOS_REGISTRO.forEach(function (t) {
+  const opt = document.createElement('option');
+  opt.value = t.valor; opt.textContent = t.etiqueta;
+  selTipoRegistro.appendChild(opt);
+});
+
+function filtrosActuales() {
+  const f = {};
+  const busqueda = document.getElementById('fBusqueda').value.trim();
+  const tipoPersona = document.getElementById('fTipoPersona').value;
+  const tipoRegistro = document.getElementById('fTipoRegistro').value;
+  const desde = document.getElementById('fDesde').value;
+  const hasta = document.getElementById('fHasta').value;
+  if (busqueda) f.busqueda = busqueda;
+  if (tipoPersona) f.tipo_persona = tipoPersona;
+  if (tipoRegistro) f.tipo_registro = tipoRegistro;
+  if (desde) f.fecha_desde = desde;
+  if (hasta) f.fecha_hasta = hasta;
+  return f;
+}
+
+async function buscar() {
+  const cont = document.getElementById('tablaWrap');
+  cont.innerHTML = elCarga();
+  try {
+    registrosActuales = await Api.getRegistros(filtrosActuales());
+    renderTabla(registrosActuales);
+  } catch (err) {
+    cont.innerHTML = elError(mensajeErrorApi(err));
+  }
+}
+
+function renderTabla(lista) {
+  const cont = document.getElementById('tablaWrap');
+  if (lista.length === 0) {
+    cont.innerHTML = elVacio('No hay registros con estos filtros', 'Probá ajustar la búsqueda o el rango de fechas.', 'list');
+    refrescarIconos();
+    return;
+  }
+  cont.innerHTML =
+    '<div class="table-wrap"><table><thead><tr>' +
+      '<th>Fecha</th><th>Hora</th><th>Persona</th><th>Tipo de persona</th><th>Tipo de registro</th><th>Observación</th><th>Estado</th>' +
+    '</tr></thead><tbody>' +
+    lista.map(function (r) {
+      return '<tr>' +
+        '<td>' + formatFechaCorta(r.FECHA) + '</td>' +
+        '<td>' + escapeHtml(r.HORA) + '</td>' +
+        '<td>' + escapeHtml(r.NOMBRE_COMPLETO) + '</td>' +
+        '<td>' + badgeTipoPersona(r.TIPO_PERSONA) + '</td>' +
+        '<td>' + badgeTipoRegistro(r.TIPO_REGISTRO) + '</td>' +
+        '<td>' + escapeHtml(r.OBSERVACION || '—') + '</td>' +
+        '<td><span class="badge badge--verde">' + escapeHtml(r.ESTADO || 'Registrado') + '</span></td>' +
+      '</tr>';
+    }).join('') +
+    '</tbody></table></div>' +
+    '<p style="margin-top:10px; font-size:12.5px; color:var(--color-gris-oscuro)">' + lista.length + ' registro(s) encontrados</p>';
+  refrescarIconos();
+}
+
+document.getElementById('btnBuscar').addEventListener('click', buscar);
+document.getElementById('btnActualizar').addEventListener('click', buscar);
+document.getElementById('btnLimpiar').addEventListener('click', function () {
+  document.getElementById('fBusqueda').value = '';
+  document.getElementById('fTipoPersona').value = '';
+  document.getElementById('fTipoRegistro').value = '';
+  document.getElementById('fDesde').value = '';
+  document.getElementById('fHasta').value = '';
+  buscar();
+});
+
+function filasParaExportar() {
+  return registrosActuales.map(function (r) {
+    return {
+      Fecha: r.FECHA, Hora: r.HORA, Persona: r.NOMBRE_COMPLETO, 'Tipo de persona': r.TIPO_PERSONA,
+      'Tipo de registro': r.TIPO_REGISTRO, Observacion: r.OBSERVACION || '', Estado: r.ESTADO || ''
+    };
+  });
+}
+
+document.getElementById('btnCsv').addEventListener('click', function () {
+  if (registrosActuales.length === 0) return;
+  const filas = filasParaExportar();
+  const headers = Object.keys(filas[0]);
+  const csv = [headers.join(',')].concat(filas.map(function (f) {
+    return headers.map(function (h) { return '"' + String(f[h]).replace(/"/g, '""') + '"'; }).join(',');
+  })).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  descargarDataUrl(url, 'registros_lacepmi.csv');
+});
+
+document.getElementById('btnExcel').addEventListener('click', function () {
+  if (registrosActuales.length === 0) return;
+  const ws = XLSX.utils.json_to_sheet(filasParaExportar());
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Registros');
+  XLSX.writeFile(wb, 'registros_lacepmi.xlsx');
+});
+
+buscar();
+</script>
+</body>
+</html>

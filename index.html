@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard · LACEPMI Presentismo QR</title>
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/responsive.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+
+<main class="main">
+  <div class="hero-institucional">
+    <div class="hero-institucional__logos">
+      <img src="assets/logo-misiones.jpg" alt="Misiones Gobierno — Ministerio de Salud Pública">
+      <div class="hero-institucional__divider"></div>
+      <strong style="font-family:var(--font-display); font-size:15px;">LACEPMI</strong>
+    </div>
+    <h1>División de Calidad de Alimentos, Agua y Laboratorio</h1>
+    <div class="hero-institucional__depend">
+      Subsecretaría de Atención Primaria y Salud Ambiental<br>
+      Dirección de Saneamiento Ambiental<br>
+      Departamento de Saneamiento Básico
+    </div>
+    <span class="hero-institucional__tag">Sistema interno de registro de asistencia y actividades</span>
+  </div>
+
+  <div class="section-label">Resumen de hoy</div>
+  <div class="resumen-dia" id="resumenDia">
+    <div class="resumen-chip"><div class="resumen-chip__num">—</div><div class="resumen-chip__label">Presentes</div></div>
+    <div class="resumen-chip"><div class="resumen-chip__num">—</div><div class="resumen-chip__label">Ausentes</div></div>
+    <div class="resumen-chip"><div class="resumen-chip__num">—</div><div class="resumen-chip__label">Tardanzas</div></div>
+    <div class="resumen-chip"><div class="resumen-chip__num">—</div><div class="resumen-chip__label">Auditorías</div></div>
+    <div class="resumen-chip"><div class="resumen-chip__num">—</div><div class="resumen-chip__label">Capacitaciones</div></div>
+    <div class="resumen-chip"><div class="resumen-chip__num">—</div><div class="resumen-chip__label">Reuniones</div></div>
+    <div class="resumen-chip"><div class="resumen-chip__num">—</div><div class="resumen-chip__label">Otros</div></div>
+  </div>
+
+  <div class="section-label">Acceso rápido</div>
+  <div class="card-grid">
+    <a class="action-card action-card--primary" href="registrar.html">
+      <div class="action-card__icon"><i data-lucide="clipboard-list"></i></div>
+      <div><div class="action-card__title">Registrar asistencia</div><div class="action-card__sub">Iniciar el flujo completo</div></div>
+    </a>
+    <a class="action-card action-card--primary" href="registrar.html">
+      <div class="action-card__icon"><i data-lucide="qr-code"></i></div>
+      <div><div class="action-card__title">Escanear QR</div><div class="action-card__sub">Lector de cámara directo</div></div>
+    </a>
+    <a class="action-card" href="estadisticas.html">
+      <div class="action-card__icon"><i data-lucide="bar-chart-3"></i></div>
+      <div><div class="action-card__title">Estadísticas</div><div class="action-card__sub">Panel con datos reales</div></div>
+    </a>
+  </div>
+
+  <div class="section-label">Registrar por tipo</div>
+  <div class="card-grid">
+    <a class="action-card" href="registrar.html?tipo=PRESENTE">
+      <div class="action-card__icon"><i data-lucide="check-circle"></i></div>
+      <div><div class="action-card__title">Presente</div><div class="action-card__sub">Escanear y marcar</div></div>
+    </a>
+    <a class="action-card" href="registrar.html?tipo=AUSENTE">
+      <div class="action-card__icon"><i data-lucide="x-circle"></i></div>
+      <div><div class="action-card__title">Ausente</div><div class="action-card__sub">Escanear y marcar</div></div>
+    </a>
+    <a class="action-card" href="registrar.html?tipo=TARDANZA">
+      <div class="action-card__icon"><i data-lucide="clock"></i></div>
+      <div><div class="action-card__title">Tardanza</div><div class="action-card__sub">Escanear y marcar</div></div>
+    </a>
+    <a class="action-card" href="registrar.html?tipo=AUDITORÍA">
+      <div class="action-card__icon"><i data-lucide="clipboard-check"></i></div>
+      <div><div class="action-card__title">Auditoría</div><div class="action-card__sub">Escanear y marcar</div></div>
+    </a>
+    <a class="action-card" href="registrar.html?tipo=CAPACITACIÓN">
+      <div class="action-card__icon"><i data-lucide="graduation-cap"></i></div>
+      <div><div class="action-card__title">Capacitación</div><div class="action-card__sub">Escanear y marcar</div></div>
+    </a>
+    <a class="action-card" href="registrar.html?tipo=REUNIÓN">
+      <div class="action-card__icon"><i data-lucide="users"></i></div>
+      <div><div class="action-card__title">Reunión</div><div class="action-card__sub">Escanear y marcar</div></div>
+    </a>
+  </div>
+
+  <div class="section-label">Gestión</div>
+  <div class="card-grid">
+    <a class="action-card" href="registrar.html?tipo=OTRO%20MOTIVO">
+      <div class="action-card__icon"><i data-lucide="more-horizontal"></i></div>
+      <div><div class="action-card__title">Otro motivo</div><div class="action-card__sub">Escanear y marcar</div></div>
+    </a>
+    <a class="action-card" href="registros.html">
+      <div class="action-card__icon"><i data-lucide="list"></i></div>
+      <div><div class="action-card__title">Registros</div><div class="action-card__sub">Consultar e historial</div></div>
+    </a>
+    <a class="action-card" href="empleados.html">
+      <div class="action-card__icon"><i data-lucide="users"></i></div>
+      <div><div class="action-card__title">Empleados</div><div class="action-card__sub">Nómina del laboratorio</div></div>
+    </a>
+    <a class="action-card" href="invitados.html">
+      <div class="action-card__icon"><i data-lucide="user-plus"></i></div>
+      <div><div class="action-card__title">Invitados</div><div class="action-card__sub">Pasantes y visitantes</div></div>
+    </a>
+    <a class="action-card" href="qr.html">
+      <div class="action-card__icon"><i data-lucide="qr-code"></i></div>
+      <div><div class="action-card__title">Códigos QR</div><div class="action-card__sub">Ver, descargar e imprimir</div></div>
+    </a>
+    <a class="action-card" href="estadisticas.html">
+      <div class="action-card__icon"><i data-lucide="bar-chart-3"></i></div>
+      <div><div class="action-card__title">Estadísticas</div><div class="action-card__sub">Panel con datos reales</div></div>
+    </a>
+  </div>
+</main>
+
+<script src="js/config.js?v=2"></script>
+<script src="js/api.js?v=2"></script>
+<script src="js/app.js"></script>
+<script>
+async function cargarResumen() {
+  const cont = document.getElementById('resumenDia');
+  try {
+    const stats = await Api.getEstadisticas();
+    const t = stats.hoyPorTipo;
+    const chips = [
+      ['Presentes', t['PRESENTE']], ['Ausentes', t['AUSENTE']], ['Tardanzas', t['TARDANZA']],
+      ['Auditorías', t['AUDITORÍA']], ['Capacitaciones', t['CAPACITACIÓN']],
+      ['Reuniones', t['REUNIÓN']], ['Otros', t['OTRO MOTIVO']]
+    ];
+    cont.innerHTML = chips.map(function (c) {
+      return '<div class="resumen-chip"><div class="resumen-chip__num">' + c[1] + '</div><div class="resumen-chip__label">' + c[0] + '</div></div>';
+    }).join('');
+  } catch (err) {
+    cont.outerHTML = elError(mensajeErrorApi(err));
+  }
+}
+cargarResumen();
+</script>
+</body>
+</html>
