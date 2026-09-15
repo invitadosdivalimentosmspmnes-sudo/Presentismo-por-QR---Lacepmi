@@ -4,7 +4,7 @@
  * (ver docs/INSTALACION.md, paso "Publicar la API").
  */
 const CONFIG = {
-  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzUj6M7uSXvkTQEOcApT7xSvIi5FrFqjCH81ZIhpNruO-peLs_iwEH_dwG502HNPFY/exec',
+  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwM5UIZVg9Ov8DyNmwya6kBn2anNMNrO0YIgFUg4Jg2CW1C2nuPDpE__CZxWjg5wfg/exec',
   NOMBRE_SISTEMA: 'LACEPMI Presentismo QR',
   NOMBRE_INSTITUCION: 'División de Calidad de Alimentos, Agua y Laboratorio',
   SUBTITULOS_INSTITUCIONALES: [
