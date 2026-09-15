@@ -1,12 +1,20 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Empleados · LACEPMI Presentismo QR</title>
-<link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="responsive.css">
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Empleados · LACEPMI Presentismo QR</title>
+  <!-- Rutas corregidas hacia la carpeta /css/ -->
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  
+  <!-- Iconos Lucide -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+  <!-- Rutas corregidas hacia la carpeta /js/ en ORDEN ESTRICTO -->
+  <script src="js/config.js?v=2"></script>
+  <script src="js/api.js?v=2"></script>
+  <script src="js/app.js"></script>
 </head>
 <body>
 
@@ -31,11 +39,7 @@
 
 <div id="modalHistorial"></div>
 
-<script src="config.js?v=2"></script>
-<script src="api.js?v=2"></script>
-<script src="app.js"></script>
 <script>
-
 let empleados = [];
 
 async function cargar() {
@@ -51,7 +55,7 @@ async function cargar() {
 
 function render(lista) {
   const cont = document.getElementById('listaEmpleados');
-  if (lista.length === 0) {
+  if (!lista || lista.length === 0) {
     cont.innerHTML = elVacio('No se encontraron empleados', 'Probá con otro término de búsqueda.', 'users');
     refrescarIconos();
     return;
@@ -102,12 +106,16 @@ async function abrirHistorial(idPersona, tipoPersona) {
       : null;
 
     const resumen = {};
-    TIPOS_REGISTRO.forEach(function (t) { resumen[t.valor] = 0; });
+    if (typeof TIPOS_REGISTRO !== 'undefined') {
+      TIPOS_REGISTRO.forEach(function (t) { resumen[t.valor] = 0; });
+    }
     registros.forEach(function (r) { if (resumen.hasOwnProperty(r.TIPO_REGISTRO)) resumen[r.TIPO_REGISTRO]++; });
 
-    const resumenHtml = TIPOS_REGISTRO.map(function (t) {
-      return '<div class="stat-card" style="padding:10px 12px;"><div class="stat-card__label">' + t.etiqueta + '</div><div class="stat-card__num" style="font-size:19px">' + resumen[t.valor] + '</div></div>';
-    }).join('');
+    const resumenHtml = (typeof TIPOS_REGISTRO !== 'undefined') 
+      ? TIPOS_REGISTRO.map(function (t) {
+          return '<div class="stat-card" style="padding:10px 12px;"><div class="stat-card__label">' + t.etiqueta + '</div><div class="stat-card__num" style="font-size:19px">' + resumen[t.valor] + '</div></div>';
+        }).join('')
+      : '';
 
     const filasHtml = registros.length
       ? registros.slice(0, 30).map(function (r) {
@@ -127,7 +135,10 @@ async function abrirHistorial(idPersona, tipoPersona) {
   }
 }
 
-cargar();
+// Aseguramos que el DOM y los scripts estén completamente listos antes de cargar
+document.addEventListener('DOMContentLoaded', function() {
+  cargar();
+});
 </script>
 </body>
 </html>
