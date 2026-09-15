@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estadísticas · LACEPMI Presentismo QR</title>
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/responsive.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<main class="main">
+  <a class="back-link" href="index.html"><i data-lucide="arrow-left"></i>Volver al dashboard</a>
+  <div class="page-header">
+    <div>
+      <h1>Estadísticas</h1>
+      <p>Datos reales calculados a partir de los registros almacenados en Google Sheets.</p>
+    </div>
+  </div>
+
+  <div id="contenido">Cargando…</div>
+</main>
+
+<script src="js/config.js?v=2"></script>
+<script src="js/api.js?v=2"></script>
+<script src="js/app.js"></script>
+<script>
+
+const PALETA = ['#1E7F5C', '#B23A32', '#A66A11', '#134074', '#1B6CA8', '#55637A', '#0B1F3A'];
+
+async function cargar() {
+  const cont = document.getElementById('contenido');
+  cont.innerHTML = elCarga();
+  try {
+    const stats = await Api.getEstadisticas();
+    render(stats);
+  } catch (err) {
+    cont.innerHTML = elError(mensajeErrorApi(err));
+  }
+}
+
+function render(stats) {
+  const cont = document.getElementById('contenido');
+
+  cont.innerHTML =
+    '<div class="stat-grid">' +
+      statCard('Empleados', stats.totalEmpleados) +
+      statCard('Invitados', stats.totalInvitados) +
+      statCard('Registros de hoy', stats.registrosHoy) +
+      statCard('Presentes hoy', stats.hoyPorTipo.PRESENTE) +
+    '</div>' +
+    '<div class="stat-grid">' +
+      statCard('Ausentes hoy', stats.hoyPorTipo.AUSENTE) +
+      statCard('Tardanzas hoy', stats.hoyPorTipo.TARDANZA) +
+      statCard('Auditorías hoy', stats.hoyPorTipo.AUDITORÍA) +
+      statCard('Capacitaciones hoy', stats.hoyPorTipo.CAPACITACIÓN) +
+    '</div>' +
+    '<div class="stat-grid" style="grid-template-columns:repeat(2,1fr); max-width:50%">' +
+      statCard('Reuniones hoy', stats.hoyPorTipo.REUNIÓN) +
+      statCard('Otros motivos hoy', stats.hoyPorTipo['OTRO MOTIVO']) +
+    '</div>' +
+
+    '<div class="chart-grid">' +
+      '<div class="panel chart-panel"><h3>Registros por tipo (total)</h3><canvas id="chartTipo"></canvas></div>' +
+      '<div class="panel chart-panel"><h3>Registros por día (últimos 14 días)</h3><canvas id="chartDia"></canvas></div>' +
+    '</div>' +
+    '<div class="chart-grid">' +
+      '<div class="panel chart-panel"><h3>Actividad mensual</h3><canvas id="chartMes"></canvas></div>' +
+      '<div class="panel chart-panel"><h3>Registros por persona (top 10)</h3><canvas id="chartPersona"></canvas></div>' +
+    '</div>';
+
+  if (stats.registrosHoy === 0 && stats.totalEmpleados === 0) {
+    // deja los gráficos vacíos, sin inventar números
+  }
+
+  dibujarGraficos(stats);
+}
+
+function statCard(label, num) {
+  return '<div class="stat-card"><div class="stat-card__label">' + label + '</div><div class="stat-card__num">' + (num || 0) + '</div></div>';
+}
+
+function dibujarGraficos(stats) {
+  const tiposLabels = TIPOS_REGISTRO.map(function (t) { return t.etiqueta; });
+  const tiposValores = TIPOS_REGISTRO.map(function (t) { return stats.totalPorTipo[t.valor] || 0; });
+
+  new Chart(document.getElementById('chartTipo'), {
+    type: 'bar',
+    data: { labels: tiposLabels, datasets: [{ data: tiposValores, backgroundColor: PALETA }] },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  const dias = Object.keys(stats.porDia).sort().slice(-14);
+  new Chart(document.getElementById('chartDia'), {
+    type: 'line',
+    data: {
+      labels: dias.map(formatFechaCorta),
+      datasets: [{ data: dias.map(function (d) { return stats.porDia[d]; }), borderColor: '#1B6CA8', backgroundColor: 'rgba(27,108,168,0.12)', fill: true, tension: 0.3 }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  const meses = Object.keys(stats.porMesActividad).sort();
+  new Chart(document.getElementById('chartMes'), {
+    type: 'bar',
+    data: { labels: meses, datasets: [{ data: meses.map(function (m) { return stats.porMesActividad[m]; }), backgroundColor: '#134074' }] },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  const personasOrdenadas = Object.entries(stats.porPersona).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 10);
+  new Chart(document.getElementById('chartPersona'), {
+    type: 'bar',
+    data: {
+      labels: personasOrdenadas.map(function (p) { return p[0]; }),
+      datasets: [{ data: personasOrdenadas.map(function (p) { return p[1]; }), backgroundColor: '#1E7F5C' }]
+    },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+}
+
+cargar();
+</script>
+</body>
+</html>

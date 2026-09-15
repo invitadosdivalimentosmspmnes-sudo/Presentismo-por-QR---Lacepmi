@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Códigos QR · LACEPMI Presentismo QR</title>
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/responsive.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="assets/qrcode-generator.js"></script>
+</head>
+<body>
+
+<main class="main">
+  <a class="back-link" href="index.html"><i data-lucide="arrow-left"></i>Volver al dashboard</a>
+  <div class="page-header">
+    <div>
+      <h1>Códigos QR</h1>
+      <p>Visualizá, descargá e imprimí los códigos de empleados e invitados.</p>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn--secondary" id="btnDescargarTodos"><i data-lucide="download"></i>Descargar todos</button>
+      <button class="btn btn--primary" id="btnImprimirTodos"><i data-lucide="printer"></i>Imprimir todos</button>
+    </div>
+  </div>
+
+  <div class="filtros-bar">
+    <div class="field" style="min-width:260px"><label>Buscar por nombre</label><input type="text" id="fBusqueda" placeholder="Nombre y apellido…"></div>
+    <div class="field"><label>Tipo</label>
+      <select id="fTipo"><option value="">Todos</option><option value="EMPLEADO">Empleados</option><option value="INVITADO">Invitados</option></select>
+    </div>
+  </div>
+
+  <div id="qrGrid">Cargando…</div>
+</main>
+
+<div id="areaImpresion" class="hidden"></div>
+
+<script src="js/config.js?v=2"></script>
+<script src="js/api.js?v=2"></script>
+<script src="js/app.js"></script>
+<script src="js/qr.js?v=2"></script>
+<script>
+
+let personas = [];
+
+async function cargar() {
+  const cont = document.getElementById('qrGrid');
+  cont.innerHTML = elCarga();
+  try {
+    const [empleados, invitados] = await Promise.all([Api.getEmpleados(), Api.getInvitados()]);
+    personas = empleados.map(function (e) {
+      return { tipo: 'EMPLEADO', nombre: e.NOMBRE_COMPLETO, id: e.ID_EMPLEADO, qr: e.QR_ID };
+    }).concat(invitados.map(function (i) {
+      return { tipo: 'INVITADO', nombre: i.NOMBRE_COMPLETO, id: i.ID_INVITADO, qr: i.QR_ID };
+    }));
+    render(personas);
+  } catch (err) {
+    cont.innerHTML = elError(mensajeErrorApi(err));
+  }
+}
+
+async function render(lista) {
+  const cont = document.getElementById('qrGrid');
+  if (lista.length === 0) {
+    cont.innerHTML = elVacio('No hay personas para mostrar', '', 'qr-code');
+    refrescarIconos();
+    return;
+  }
+  cont.innerHTML = '<div class="qr-grid">' + lista.map(function (p, i) {
+    return '<div class="qr-card">' +
+      '<canvas id="qrc' + i + '"></canvas>' +
+      '<div class="qr-card__nombre">' + escapeHtml(p.nombre) + '</div>' +
+      '<div class="qr-card__id">' + escapeHtml(p.id) + ' · ' + (p.tipo === 'EMPLEADO' ? 'Empleado' : 'Invitado') + '</div>' +
+      '<div class="qr-card__actions">' +
+        '<button class="btn btn--secondary" data-descargar="' + i + '">Descargar</button>' +
+        '<button class="btn btn--ghost" data-imprimir="' + i + '">Imprimir</button>' +
+      '</div>' +
+    '</div>';
+  }).join('') + '</div>';
+
+  for (let i = 0; i < lista.length; i++) {
+    await dibujarQr(document.getElementById('qrc' + i), lista[i].qr);
+  }
+  refrescarIconos();
+
+  document.querySelectorAll('[data-descargar]').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      const p = lista[Number(btn.getAttribute('data-descargar'))];
+      const dataUrl = await qrComoDataUrl(p.qr);
+      descargarDataUrl(dataUrl, p.qr + '.png');
+    });
+  });
+  document.querySelectorAll('[data-imprimir]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const p = lista[Number(btn.getAttribute('data-imprimir'))];
+      imprimir([p]);
+    });
+  });
+}
+
+function aplicarFiltros() {
+  const q = document.getElementById('fBusqueda').value.toLowerCase();
+  const tipo = document.getElementById('fTipo').value;
+  const lista = personas.filter(function (p) {
+    const okNombre = p.nombre.toLowerCase().indexOf(q) !== -1;
+    const okTipo = !tipo || p.tipo === tipo;
+    return okNombre && okTipo;
+  });
+  render(lista);
+}
+
+document.getElementById('fBusqueda').addEventListener('input', aplicarFiltros);
+document.getElementById('fTipo').addEventListener('change', aplicarFiltros);
+
+document.getElementById('btnDescargarTodos').addEventListener('click', async function () {
+  for (const p of personas) {
+    const dataUrl = await qrComoDataUrl(p.qr);
+    descargarDataUrl(dataUrl, p.qr + '.png');
+    await new Promise(function (r) { setTimeout(r, 180); });
+  }
+});
+
+document.getElementById('btnImprimirTodos').addEventListener('click', function () { imprimir(personas); });
+
+async function imprimir(lista) {
+  const area = document.getElementById('areaImpresion');
+  const bloques = [];
+  for (const p of lista) {
+    const dataUrl = await qrComoDataUrl(p.qr);
+    bloques.push(
+      '<div style="display:inline-block; width:220px; text-align:center; padding:16px; border:1px solid #ccc; margin:8px; page-break-inside:avoid;">' +
+        '<img src="' + dataUrl + '" style="width:160px; height:160px;">' +
+        '<div style="font-weight:700; font-size:13px; margin-top:8px;">' + escapeHtml(p.nombre) + '</div>' +
+        '<div style="font-size:11px; color:#666;">' + escapeHtml(p.id) + '</div>' +
+      '</div>'
+    );
+  }
+  area.innerHTML = bloques.join('');
+  area.classList.remove('hidden');
+  window.print();
+  area.classList.add('hidden');
+}
+
+cargar();
+</script>
+</body>
+</html>
