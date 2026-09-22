@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Invitados · LACEPMI Presentismo QR</title>
-<link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="responsive.css">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/responsive.css">
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </head>
@@ -32,13 +32,14 @@
 </main>
 
 <div id="modalAlta"></div>
+<div id="modalEditar"></div>
 <div id="modalHistorial"></div>
 <div id="modalQr"></div>
 
-<script src="config.js?v=2"></script>
-<script src="api.js?v=2"></script>
-<script src="app.js"></script>
-<script src="qr.js"></script>
+<script src="js/config.js?v=2"></script>
+<script src="js/api.js?v=2"></script>
+<script src="js/app.js"></script>
+<script src="js/qr.js"></script>
 <script>
 
 let invitados = [];
@@ -68,9 +69,11 @@ function render(lista) {
       '<div class="persona-card__nombre">' + escapeHtml(inv.NOMBRE_COMPLETO) + '</div>' +
       '<div class="persona-card__id">' + escapeHtml(inv.ID_INVITADO) + '</div>' +
       '<div class="persona-card__meta">' + escapeHtml(inv.TIPO || 'Visitante') + ' · DNI ' + enmascararDni(inv.DNI) + '</div>' +
+      '<div class="persona-card__meta">' + escapeHtml(inv.SECTOR || 'Sin sector') + ' · ' + escapeHtml(inv.ESTADO || 'ACTIVO') + '</div>' +
       '<div style="display:flex; gap:6px; margin-top:12px;">' +
         '<button class="btn btn--secondary" style="flex:1; padding:7px; font-size:12.5px" data-hist="' + escapeHtml(inv.ID_INVITADO) + '">Historial</button>' +
         '<button class="btn btn--ghost" style="flex:1; padding:7px; font-size:12.5px" data-qr="' + escapeHtml(inv.ID_INVITADO) + '">Ver QR</button>' +
+        '<button class="btn btn--secondary" style="flex:1; padding:7px; font-size:12.5px" data-edit="' + escapeHtml(inv.ID_INVITADO) + '"><i data-lucide="pencil"></i>Editar</button>' +
       '</div>' +
     '</div>';
   }).join('') + '</div>';
@@ -81,6 +84,10 @@ function render(lista) {
   document.querySelectorAll('[data-qr]').forEach(function (btn) {
     btn.addEventListener('click', function () { abrirQr(btn.getAttribute('data-qr')); });
   });
+  document.querySelectorAll('[data-edit]').forEach(function (btn) {
+    btn.addEventListener('click', function () { abrirFormEdicion(btn.getAttribute('data-edit')); });
+  });
+  refrescarIconos();
 }
 
 document.getElementById('inputBusqueda').addEventListener('input', function (e) {
@@ -160,6 +167,73 @@ async function guardarInvitado() {
     refrescarIconos();
     btn.disabled = false;
     btn.textContent = 'Generar QR';
+  }
+}
+
+function abrirFormEdicion(idInvitado) {
+  const invitado = invitados.find(function (i) { return i.ID_INVITADO === idInvitado; });
+  if (!invitado) return;
+  const modal = document.getElementById('modalEditar');
+  modal.innerHTML =
+    '<div class="overlay" id="overlayEditar"><div class="modal">' +
+      '<h3>Editar invitado</h3>' +
+      '<p>' + escapeHtml(invitado.ID_INVITADO) + '</p>' +
+      '<div id="errorEditar"></div>' +
+      '<div class="form-row">' +
+        '<div class="field"><label>Apellido *</label><input type="text" id="eApellido" value="' + escapeHtml(invitado.APELLIDO) + '"></div>' +
+        '<div class="field"><label>Nombres *</label><input type="text" id="eNombres" value="' + escapeHtml(invitado.NOMBRES) + '"></div>' +
+      '</div>' +
+      '<div class="field"><label>DNI *</label><input type="text" id="eDni" inputmode="numeric" value="' + escapeHtml(invitado.DNI) + '"></div>' +
+      '<div class="form-row">' +
+        '<div class="field"><label>Tipo de visitante</label><select id="eTipo"><option>Pasante</option><option>Visitante</option><option>Colaborador</option><option>Otro</option></select></div>' +
+        '<div class="field"><label>Área / Sector</label><input type="text" id="eSector" value="' + escapeHtml(invitado.SECTOR) + '"></div>' +
+      '</div>' +
+      '<div class="field"><label>Observación</label><textarea id="eObservacion" rows="2">' + escapeHtml(invitado.OBSERVACION) + '</textarea></div>' +
+      '<div class="field"><label>Estado</label><select id="eEstado"><option value="ACTIVO">Activo</option><option value="INACTIVO">Inactivo</option></select></div>' +
+      '<div class="modal__actions">' +
+        '<button class="btn btn--secondary" id="btnCancelarEditar">Cancelar</button>' +
+        '<button class="btn btn--primary" id="btnGuardarEditar">Guardar cambios</button>' +
+      '</div>' +
+    '</div></div>';
+  document.getElementById('eTipo').value = invitado.TIPO || 'Visitante';
+  document.getElementById('eEstado').value = invitado.ESTADO === 'INACTIVO' ? 'INACTIVO' : 'ACTIVO';
+  document.getElementById('btnCancelarEditar').addEventListener('click', function () { modal.innerHTML = ''; });
+  document.getElementById('overlayEditar').addEventListener('click', function (e) {
+    if (e.target.id === 'overlayEditar') modal.innerHTML = '';
+  });
+  document.getElementById('btnGuardarEditar').addEventListener('click', function () { guardarEdicionInvitado(idInvitado); });
+}
+
+async function guardarEdicionInvitado(idInvitado) {
+  const errorBox = document.getElementById('errorEditar');
+  const datos = {
+    id_invitado: idInvitado,
+    apellido: document.getElementById('eApellido').value.trim(),
+    nombres: document.getElementById('eNombres').value.trim(),
+    dni: document.getElementById('eDni').value.trim(),
+    tipo: document.getElementById('eTipo').value,
+    sector: document.getElementById('eSector').value.trim(),
+    observacion: document.getElementById('eObservacion').value.trim(),
+    estado: document.getElementById('eEstado').value
+  };
+  if (!datos.apellido || !datos.nombres || !datos.dni) {
+    errorBox.innerHTML = elError('Apellido, nombres y DNI son obligatorios.');
+    return;
+  }
+  const btn = document.getElementById('btnGuardarEditar');
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+  try {
+    const res = await Api.actualizarInvitado(datos);
+    if (!res.ok) throw new Error(res.error || 'No se pudo actualizar el invitado.');
+    invitados = invitados.map(function (i) { return i.ID_INVITADO === idInvitado ? res.invitado : i; });
+    document.getElementById('modalEditar').innerHTML = '';
+    render(invitados);
+  } catch (err) {
+    errorBox.innerHTML = elError(err.message || mensajeErrorApi(err));
+    btn.disabled = false;
+    btn.textContent = 'Guardar cambios';
+    refrescarIconos();
   }
 }
 
