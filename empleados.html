@@ -11,7 +11,7 @@
 <body>
 
 <main class="main">
-  <a class="back-link" href="index.html"><i data-lucide="arrow-left"></i>Volver a incio</a>
+  <a class="back-link" href="index.html"><i data-lucide="arrow-left"></i>Volver a inicio</a>
   <div class="page-header">
     <div>
       <h1>Empleados</h1>
@@ -34,7 +34,7 @@
 <div id="modalHistorial"></div>
 
 <script src="config.js?v=2"></script>
-<script src="api.js?v=2"></script>
+<script src="api.js?v=3"></script>
 <script src="app.js"></script>
 <script>
 
@@ -65,6 +65,8 @@ function render(lista) {
       '<div class="persona-card__nombre">' + escapeHtml(e.NOMBRE_COMPLETO) + '</div>' +
       '<div class="persona-card__id">' + escapeHtml(e.ID_EMPLEADO) + '</div>' +
       '<div class="persona-card__meta">DNI: ' + enmascararDni(e.DNI) + (e.SECTOR ? ' · ' + escapeHtml(e.SECTOR) : '') + '</div>' +
+      '<div class="persona-card__meta">Estado: ' + escapeHtml(e.ESTADO || 'ACTIVO') + '</div>' +
+      '<button class="btn btn--secondary btn--full" data-edit-empleado="' + escapeHtml(e.ID_EMPLEADO) + '"><i data-lucide="pencil"></i>Editar</button>' +
     '</div>';
   }).join('') + '</div>';
 
@@ -73,6 +75,14 @@ function render(lista) {
       abrirHistorial(card.getAttribute('data-id'), 'EMPLEADO');
     });
   });
+  document.querySelectorAll('[data-edit-empleado]').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      const empleado = empleados.find(function (item) { return item.ID_EMPLEADO === btn.getAttribute('data-edit-empleado'); });
+      if (empleado) abrirFormEdicion(empleado);
+    });
+  });
+  refrescarIconos();
 }
 
 document.getElementById('inputBusqueda').addEventListener('input', function (e) {
@@ -111,6 +121,70 @@ function abrirFormAlta() {
     if (e.target.id === 'overlayAlta') modal.innerHTML = '';
   });
   document.getElementById('btnGuardarAlta').addEventListener('click', guardarEmpleado);
+}
+
+function abrirFormEdicion(empleado) {
+  const modal = document.getElementById('modalAlta');
+  modal.innerHTML =
+    '<div class="overlay" id="overlayEdicion"><div class="modal">' +
+      '<h3>Editar empleado</h3>' +
+      '<p>' + escapeHtml(empleado.ID_EMPLEADO) + '</p>' +
+      '<div id="errorEdicion"></div>' +
+      '<div class="form-row">' +
+        '<div class="field"><label>Apellido *</label><input type="text" id="eApellido" value="' + escapeHtml(empleado.APELLIDO) + '"></div>' +
+        '<div class="field"><label>Nombres *</label><input type="text" id="eNombres" value="' + escapeHtml(empleado.NOMBRES) + '"></div>' +
+      '</div>' +
+      '<div class="field"><label>DNI *</label><input type="text" id="eDni" inputmode="numeric" value="' + escapeHtml(empleado.DNI) + '"></div>' +
+      '<div class="form-row">' +
+        '<div class="field"><label>Área / Sector</label><input type="text" id="eSector" value="' + escapeHtml(empleado.SECTOR || '') + '"></div>' +
+        '<div class="field"><label>Cargo</label><input type="text" id="eCargo" value="' + escapeHtml(empleado.CARGO || '') + '"></div>' +
+      '</div>' +
+      '<div class="field"><label>Estado</label><select id="eEstado"><option value="ACTIVO">Activo</option><option value="INACTIVO">Inactivo</option></select></div>' +
+      '<div class="modal__actions">' +
+        '<button class="btn btn--secondary" id="btnCancelarEdicion">Cancelar</button>' +
+        '<button class="btn btn--primary" id="btnGuardarEdicion">Guardar cambios</button>' +
+      '</div>' +
+    '</div></div>';
+  document.getElementById('eEstado').value = empleado.ESTADO || 'ACTIVO';
+  document.getElementById('btnCancelarEdicion').addEventListener('click', function () { modal.innerHTML = ''; });
+  document.getElementById('overlayEdicion').addEventListener('click', function (e) {
+    if (e.target.id === 'overlayEdicion') modal.innerHTML = '';
+  });
+  document.getElementById('btnGuardarEdicion').addEventListener('click', function () {
+    guardarEdicionEmpleado(empleado.ID_EMPLEADO);
+  });
+  refrescarIconos();
+}
+
+async function guardarEdicionEmpleado(idEmpleado) {
+  const datos = {
+    persona_tipo: 'EMPLEADO', persona_id: idEmpleado,
+    apellido: document.getElementById('eApellido').value.trim(),
+    nombres: document.getElementById('eNombres').value.trim(),
+    dni: document.getElementById('eDni').value.trim(),
+    sector: document.getElementById('eSector').value.trim(),
+    cargo: document.getElementById('eCargo').value.trim(),
+    estado: document.getElementById('eEstado').value
+  };
+  const errorBox = document.getElementById('errorEdicion');
+  if (!datos.apellido || !datos.nombres || !datos.dni) {
+    errorBox.innerHTML = elError('Apellido, nombres y DNI son obligatorios.');
+    return;
+  }
+  const btn = document.getElementById('btnGuardarEdicion');
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+  try {
+    const res = await Api.actualizarPersona(datos);
+    if (!res.ok) throw new Error(res.error || 'No se pudo actualizar el empleado.');
+    empleados = empleados.map(function (item) { return item.ID_EMPLEADO === idEmpleado ? res.persona : item; });
+    document.getElementById('modalAlta').innerHTML = '';
+    render(empleados);
+  } catch (err) {
+    errorBox.innerHTML = elError(err.message || mensajeErrorApi(err));
+    btn.disabled = false;
+    btn.textContent = 'Guardar cambios';
+  }
 }
 
 async function guardarEmpleado() {
