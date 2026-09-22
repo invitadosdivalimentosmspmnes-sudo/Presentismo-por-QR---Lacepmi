@@ -48,7 +48,12 @@ const Api = (function () {
     if (!resp.ok) {
       throw new ApiError('ERROR_API', 'La API respondió con un error (' + resp.status + ').');
     }
-    return resp.json();
+    
+    try {
+      return await resp.json();
+    } catch (e) {
+      throw new ApiError('ERROR_PARSEO', 'La respuesta del servidor no es un JSON válido.');
+    }
   }
 
   return {
@@ -58,6 +63,7 @@ const Api = (function () {
     getRegistros: function (filtros) { return get('getRegistros', filtros); },
     getEstadisticas: function () { return get('getEstadisticas'); },
     identificar: function (qrId) { return get('identificar', { qr_id: qrId }); },
+    crearEmpleado: function (datos) { return post('crearEmpleado', datos); },
     crearInvitado: function (datos) { return post('crearInvitado', datos); },
     registrar: function (datos) { return post('registrar', datos); }
   };
